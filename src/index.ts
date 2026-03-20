@@ -59,7 +59,32 @@ app.post('/webhook/:token', async (req, res) => {
     return res.status(404).send('Bot not found or inactive');
   }
 
-  // 2. Instantiate Grammy Bot
+  // 2. Upsert Telegram User (BotUser)
+  const from = req.body.message?.from || req.body.callback_query?.from;
+  if (from) {
+    await prisma.botUser.upsert({
+      where: {
+        teleId_botId: {
+          teleId: String(from.id),
+          botId: botConfig.id,
+        },
+      },
+      update: {
+        username: from.username,
+        firstName: from.first_name,
+        lastName: from.last_name,
+      },
+      create: {
+        teleId: String(from.id),
+        username: from.username,
+        firstName: from.first_name,
+        lastName: from.last_name,
+        botId: botConfig.id,
+      },
+    });
+  }
+
+  // 3. Instantiate Grammy Bot
   const bot = new Bot(token);
 
   // 3. Define Bot Logic

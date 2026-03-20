@@ -55,7 +55,10 @@ async function main() {
     },
   ];
 
-  // Clear existing products for this bot to avoid duplicates
+  // Clear existing inventory and products for this bot to avoid duplicates/constraints
+  await prisma.productAccount.deleteMany({
+    where: { product: { botId: bot.id } },
+  });
   await prisma.product.deleteMany({
     where: { botId: bot.id },
   });
@@ -86,6 +89,24 @@ async function main() {
     });
   }
   console.log('Seed product accounts created successfully');
+
+  // 5. Create Demo Bot Users (Customers)
+  const allBots = await prisma.botConfig.findMany();
+  for (const botConfig of allBots) {
+    await prisma.botUser.upsert({
+      where: { teleId_botId: { teleId: '987654321', botId: botConfig.id } },
+      update: {},
+      create: {
+        teleId: '987654321',
+        username: 'customer_demo',
+        firstName: 'Khách',
+        lastName: 'Demo',
+        balance: 150000,
+        botId: botConfig.id,
+      },
+    });
+  }
+  console.log('Seed bot users created successfully');
 }
 
 main()

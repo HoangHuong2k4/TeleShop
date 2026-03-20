@@ -36,6 +36,23 @@ model BotConfig {
   updatedAt   DateTime  @updatedAt
   products    Product[]
   orders      Order[]
+  botUsers    BotUser[]
+}
+
+model BotUser {
+  id        Int      @id @default(autoincrement())
+  teleId    String
+  username  String?
+  firstName String?
+  lastName  String?
+  balance   Float    @default(0)
+  botId     Int
+  bot       BotConfig @relation(fields: [botId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+
+  @@unique([teleId, botId])
 }
 
 model Product {
@@ -73,6 +90,8 @@ model Order {
   botId          Int
   bot            BotConfig        @relation(fields: [botId], references: [id])
   customerTeleId String
+  botUserId      Int?
+  botUser        BotUser?         @relation(fields: [botUserId], references: [id])
   totalAmount    Float
   status         OrderStatus      @default(PENDING)
   paymentCode    String           @unique
