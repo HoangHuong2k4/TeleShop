@@ -39,14 +39,27 @@ model BotConfig {
 }
 
 model Product {
-  id          Int       @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   botId       Int
-  bot         BotConfig @relation(fields: [botId], references: [id])
+  bot         BotConfig        @relation(fields: [botId], references: [id])
   name        String
   price       Float
-  description String?   @db.Text
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  description String?          @db.Text
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  accounts    ProductAccount[]
+}
+
+model ProductAccount {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  content   String   @db.Text
+  isSold    Boolean  @default(false)
+  orderId   Int?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum OrderStatus {
@@ -56,13 +69,14 @@ enum OrderStatus {
 }
 
 model Order {
-  id             Int         @id @default(autoincrement())
+  id             Int              @id @default(autoincrement())
   botId          Int
-  bot            BotConfig   @relation(fields: [botId], references: [id])
+  bot            BotConfig        @relation(fields: [botId], references: [id])
   customerTeleId String
   totalAmount    Float
-  status         OrderStatus @default(PENDING)
-  paymentCode    String      @unique
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  status         OrderStatus      @default(PENDING)
+  paymentCode    String           @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  accounts       ProductAccount[]
 }

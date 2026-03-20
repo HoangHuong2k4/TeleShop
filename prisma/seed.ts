@@ -70,6 +70,22 @@ async function main() {
   }
 
   console.log('Seed products created successfully');
+
+  // 4. Create Product Accounts (Inventory)
+  const allProducts = await prisma.product.findMany();
+  for (const product of allProducts) {
+    // Clear existing accounts for these products first
+    await prisma.productAccount.deleteMany({ where: { productId: product.id } });
+    
+    await prisma.productAccount.createMany({
+      data: [
+        { productId: product.id, content: `acc1_${product.name.toLowerCase().replace(/\s+/g, '_')}@example.com:pass123` },
+        { productId: product.id, content: `acc2_${product.name.toLowerCase().replace(/\s+/g, '_')}@example.com:pass456` },
+        { productId: product.id, content: `LICENSE-KEY-${product.name.toUpperCase().replace(/\s+/g, '-')}-789-XYZ`, isSold: false },
+      ],
+    });
+  }
+  console.log('Seed product accounts created successfully');
 }
 
 main()
