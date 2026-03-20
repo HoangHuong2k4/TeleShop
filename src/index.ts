@@ -2,8 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { Bot, webhookCallback } from 'grammy';
-import { Product } from '@prisma/client';
 import prisma from './lib/prisma';
+
+interface Product {
+  id: number;
+  botId: number;
+  name: string;
+  price: number;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 import * as authController from './controllers/authController';
 import * as adminController from './controllers/adminController';
 import { authMiddleware } from './middleware/auth';
@@ -64,7 +73,7 @@ app.post('/webhook/:token', async (req, res) => {
       return await ctx.reply('Hiện chưa có sản phẩm nào.');
     }
 
-    const menuMessage = products.map((p) => `${p.name} - ${p.price} VND\n${p.description || ''}`).join('\n\n');
+    const menuMessage = products.map((p: Product) => `${p.name} - ${p.price} VND\n${p.description || ''}`).join('\n\n');
     await ctx.reply(`Danh mục sản phẩm:\n\n${menuMessage}`);
   });
 
