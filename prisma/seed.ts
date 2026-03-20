@@ -39,9 +39,14 @@ async function main() {
   // 3. Create Products
   const products = [
     {
-      name: 'ChatGPT Plus Business Pro',
+      name: 'ChatGPT Plus',
       price: 500000,
-      description: 'Tài khoản ChatGPT Plus phiên bản Business Pro, ổn định, không giới hạn.',
+      description: 'Tài khoản ChatGPT Plus cá nhân chính chủ.',
+    },
+    {
+      name: 'ChatGPT Business',
+      price: 1200000,
+      description: 'Tài khoản ChatGPT Business ổn định, không giới hạn.',
     },
     {
       name: 'Microsoft 365 (1 Năm)',
@@ -51,7 +56,7 @@ async function main() {
     {
       name: 'Microsoft 365 (5 Năm)',
       price: 950000,
-      description: 'Bản quyền Microsoft 365 chính hãng thời hạn 5 năm, tiết kiệm hơn.',
+      description: 'Bản quyền Microsoft 365 chính hãng thời hạn 5 năm.',
     },
   ];
 

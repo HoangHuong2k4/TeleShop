@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { Bot, webhookCallback } from 'grammy';
+import multer from 'multer';
 import prisma from './lib/prisma';
 
 interface Product {
@@ -21,6 +22,7 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors());
 app.use(express.json());
@@ -37,8 +39,21 @@ app.post('/api/auth/login', authController.login);
 // Admin routes (Protected)
 app.get('/api/admin/bots', authMiddleware as any, adminController.getBots as any);
 app.post('/api/admin/bots', authMiddleware as any, adminController.createBot as any);
+
+// Admin - Products
 app.get('/api/admin/products/:botId', authMiddleware as any, adminController.getProducts as any);
 app.post('/api/admin/products', authMiddleware as any, adminController.createProduct as any);
+app.put('/api/admin/products/:id', authMiddleware as any, adminController.updateProduct as any);
+app.delete('/api/admin/products/:id', authMiddleware as any, adminController.deleteProduct as any);
+
+// Admin - Accounts (Inventory)
+app.get('/api/admin/accounts/:productId', authMiddleware as any, adminController.getAccounts as any);
+app.post('/api/admin/accounts', authMiddleware as any, adminController.createAccount as any);
+app.put('/api/admin/accounts/:id', authMiddleware as any, adminController.updateAccount as any);
+app.delete('/api/admin/accounts/:id', authMiddleware as any, adminController.deleteAccount as any);
+
+// Admin - Excel Import
+app.post('/api/admin/accounts/import', authMiddleware as any, upload.single('file'), adminController.importAccounts as any);
 
 /**
  * Webhook endpoint for all bots
