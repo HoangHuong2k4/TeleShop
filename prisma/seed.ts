@@ -1,15 +1,19 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   // 1. Create Demo User
+  const hashedPassword = await bcrypt.hash('password123', 10);
   const user = await prisma.user.upsert({
     where: { email: 'admin@teleshop.com' },
-    update: {},
+    update: {
+      password: hashedPassword,
+    },
     create: {
       email: 'admin@teleshop.com',
-      password: 'password123', // In real app, use bcrypt
+      password: hashedPassword,
       plan: 'PRO',
     },
   });
@@ -50,6 +54,11 @@ async function main() {
       description: 'Bản quyền Microsoft 365 chính hãng thời hạn 5 năm, tiết kiệm hơn.',
     },
   ];
+
+  // Clear existing products for this bot to avoid duplicates
+  await prisma.product.deleteMany({
+    where: { botId: bot.id },
+  });
 
   for (const p of products) {
     await prisma.product.create({
