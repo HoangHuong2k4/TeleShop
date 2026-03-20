@@ -36,6 +36,10 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    if (!user.isActive) {
+      return res.status(403).json({ message: 'Account is disabled. Please contact support.' });
+    }
+
     const token = jwt.sign(
       { id: user.id, email: user.email, plan: user.plan },
       JWT_SECRET,

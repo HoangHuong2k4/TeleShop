@@ -17,6 +17,7 @@ model User {
   email     String   @unique
   password  String
   plan      Plan     @default(BASIC)
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   bots      BotConfig[]
