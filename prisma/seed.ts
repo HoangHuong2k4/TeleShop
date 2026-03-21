@@ -4,114 +4,96 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  // 1. Create Demo User
+  // 1. Create Admin and User accounts
   const hashedPassword = await bcrypt.hash('password123', 10);
-  const user = await prisma.user.upsert({
+  
+  const admin = await prisma.user.upsert({
     where: { email: 'admin@teleshop.com' },
-    update: {
-      password: hashedPassword,
-    },
-    create: {
-      email: 'admin@teleshop.com',
-      password: hashedPassword,
-      plan: 'PRO',
-    },
+    update: { password: hashedPassword, role: 'ADMIN', plan: 'PRO' },
+    create: { email: 'admin@teleshop.com', password: hashedPassword, role: 'ADMIN', plan: 'PRO' },
   });
 
-  console.log('User created:', user.email);
-
-  // 2. Create Demo Bot Config
-  const bot = await prisma.botConfig.upsert({
-    where: { botToken: '123456789:ABCDEF_DEMO_TOKEN' },
-    update: {},
-    create: {
-      userId: user.id,
-      botToken: '123456789:ABCDEF_DEMO_TOKEN',
-      botUsername: 'TeleShopDemoBot',
-      bankName: 'MB Bank',
-      bankAccount: '999999999',
-      bankOwner: 'HUONG MMO',
-    },
+  const normalUser = await prisma.user.upsert({
+    where: { email: 'user@teleshop.com' },
+    update: { password: hashedPassword, role: 'USER', plan: 'BASIC' },
+    create: { email: 'user@teleshop.com', password: hashedPassword, role: 'USER', plan: 'BASIC' },
   });
 
-  console.log('Bot created:', bot.botUsername);
+  console.log('Seed users created: admin@teleshop.com, user@teleshop.com');
 
-  // 3. Create Products
-  const products = [
-    {
-      name: 'ChatGPT Plus',
-      price: 500000,
-      description: 'Tài khoản ChatGPT Plus cá nhân chính chủ.',
-    },
-    {
-      name: 'ChatGPT Business',
-      price: 1200000,
-      description: 'Tài khoản ChatGPT Business ổn định, không giới hạn.',
-    },
-    {
-      name: 'Microsoft 365 (1 Năm)',
-      price: 250000,
-      description: 'Bản quyền Microsoft 365 chính hãng thời hạn 1 năm.',
-    },
-    {
-      name: 'Microsoft 365 (5 Năm)',
-      price: 950000,
-      description: 'Bản quyền Microsoft 365 chính hãng thời hạn 5 năm.',
-    },
+  // Clear all previous transactional data to start fresh
+  await prisma.order.deleteMany({});
+  await prisma.productAccount.deleteMany({});
+  await prisma.product.deleteMany({});
+  await prisma.botUser.deleteMany({});
+  await prisma.botConfig.deleteMany({});
+
+  // 2. Create Resources for both
+  const usersToSeed = [
+    { u: admin, botName: 'AdminSuperBot', token: 'ADMIN_BOT_TOKEN' },
+    { u: normalUser, botName: 'UserShopBot', token: 'USER_BOT_TOKEN' }
   ];
 
-  // Clear existing inventory and products for this bot to avoid duplicates/constraints
-  await prisma.productAccount.deleteMany({
-    where: { product: { botId: bot.id } },
-  });
-  await prisma.product.deleteMany({
-    where: { botId: bot.id },
-  });
-
-  for (const p of products) {
-    await prisma.product.create({
+  for (const item of usersToSeed) {
+    const bot = await prisma.botConfig.create({
       data: {
-        ...p,
+        userId: item.u.id,
+        botToken: item.token,
+        botUsername: item.botName,
+        bankName: 'MB Bank',
+        bankAccount: '123456789',
+        bankOwner: item.u.email,
+        sepayApiKey: `SP_${item.u.id}_KEY`
+      }
+    });
+
+    const products = [
+      { name: 'Gói Premium', price: 100000, desc: 'Dịch vụ cao cấp' },
+      { name: 'Gói Thử Nghiệm', price: 10000, desc: 'Dịch vụ test' }
+    ];
+
+    for (const p of products) {
+      const product = await prisma.product.create({
+        data: {
+          botId: bot.id,
+          name: p.name,
+          price: p.price,
+          description: p.desc
+        }
+      });
+
+      // Seeding 5 accounts per product
+      await prisma.productAccount.createMany({
+        data: Array.from({ length: 5 }).map((_, i) => ({
+          productId: product.id,
+          content: `${product.name.toLowerCase()}_acc_${i+1}@teleshop.com:pass123`
+        }))
+      });
+    }
+
+    // Seed some orders for dashboard visibility
+    await prisma.order.create({
+      data: {
         botId: bot.id,
-      },
+        customerTeleId: '88888888',
+        totalAmount: 200000,
+        status: 'PAID' as any,
+        paymentCode: `INV-${item.u.id}-001`,
+      }
+    });
+
+    await prisma.order.create({
+      data: {
+        botId: bot.id,
+        customerTeleId: '99999999',
+        totalAmount: 10000,
+        status: 'PENDING' as any,
+        paymentCode: `INV-${item.u.id}-002`,
+      }
     });
   }
 
-  console.log('Seed products created successfully');
-
-  // 4. Create Product Accounts (Inventory)
-  const allProducts = await prisma.product.findMany();
-  for (const product of allProducts) {
-    // Clear existing accounts for these products first
-    await prisma.productAccount.deleteMany({ where: { productId: product.id } });
-    
-    await prisma.productAccount.createMany({
-      data: [
-        { productId: product.id, content: `acc1_${product.name.toLowerCase().replace(/\s+/g, '_')}@example.com:pass123` },
-        { productId: product.id, content: `acc2_${product.name.toLowerCase().replace(/\s+/g, '_')}@example.com:pass456` },
-        { productId: product.id, content: `LICENSE-KEY-${product.name.toUpperCase().replace(/\s+/g, '-')}-789-XYZ`, isSold: false },
-      ],
-    });
-  }
-  console.log('Seed product accounts created successfully');
-
-  // 5. Create Demo Bot Users (Customers)
-  const allBots = await prisma.botConfig.findMany();
-  for (const botConfig of allBots) {
-    await prisma.botUser.upsert({
-      where: { teleId_botId: { teleId: '987654321', botId: botConfig.id } },
-      update: {},
-      create: {
-        teleId: '987654321',
-        username: 'customer_demo',
-        firstName: 'Khách',
-        lastName: 'Demo',
-        balance: 150000,
-        botId: botConfig.id,
-      },
-    });
-  }
-  console.log('Seed bot users created successfully');
+  console.log('Seed resources and orders created successfully');
 }
 
 main()

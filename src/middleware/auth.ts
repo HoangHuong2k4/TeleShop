@@ -8,6 +8,7 @@ export interface AuthRequest extends Request {
     id: number;
     email: string;
     plan: string;
+    role: string;
   };
 }
 
@@ -25,4 +26,13 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   } catch (error) {
     return res.status(401).json({ message: 'Invalid token' });
   }
+};
+
+export const roleMiddleware = (roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Access denied: Insufficient permissions' });
+    }
+    next();
+  };
 };

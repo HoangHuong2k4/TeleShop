@@ -16,7 +16,7 @@ interface Product {
 }
 import * as authController from './controllers/authController';
 import * as adminController from './controllers/adminController';
-import { authMiddleware } from './middleware/auth';
+import { authMiddleware, roleMiddleware } from './middleware/auth';
 
 dotenv.config();
 
@@ -37,8 +37,10 @@ app.post('/api/auth/register', authController.register);
 app.post('/api/auth/login', authController.login);
 
 // Admin routes (Protected)
+app.get('/api/admin/stats', authMiddleware as any, roleMiddleware(['ADMIN', 'USER']) as any, adminController.getStats as any);
 app.get('/api/admin/bots', authMiddleware as any, adminController.getBots as any);
 app.post('/api/admin/bots', authMiddleware as any, adminController.createBot as any);
+app.put('/api/admin/bots/:id', authMiddleware as any, adminController.updateBot as any);
 
 // Admin - Products
 app.get('/api/admin/products/:botId', authMiddleware as any, adminController.getProducts as any);
@@ -54,6 +56,12 @@ app.delete('/api/admin/accounts/:id', authMiddleware as any, adminController.del
 
 // Admin - Excel Import
 app.post('/api/admin/accounts/import', authMiddleware as any, upload.single('file'), adminController.importAccounts as any);
+
+// Admin - User Management (ADMIN only)
+
+app.get('/api/admin/users', authMiddleware as any, roleMiddleware(['ADMIN']) as any, adminController.getUsers as any);
+app.put('/api/admin/users/:id', authMiddleware as any, roleMiddleware(['ADMIN']) as any, adminController.updateUser as any);
+app.delete('/api/admin/users/:id', authMiddleware as any, roleMiddleware(['ADMIN']) as any, adminController.deleteUser as any);
 
 /**
  * Webhook endpoint for all bots

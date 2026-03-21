@@ -41,12 +41,12 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, plan: user.plan },
+      { id: user.id, email: user.email, plan: user.plan, role: (user as any).role },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
 
-    res.json({ token, user: { id: user.id, email: user.email, plan: user.plan } });
+    res.json({ token, user: { id: user.id, email: user.email, plan: user.plan, role: (user as any).role } });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }

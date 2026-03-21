@@ -3,16 +3,95 @@ import { AuthRequest } from '../middleware/auth';
 import prisma from '../lib/prisma';
 import * as XLSX from 'xlsx';
 
+// Dashboard Stats
+export const getStats = async (req: AuthRequest, res: Response) => {
+  try {
+    const isAdmin = req.user?.role === 'ADMIN';
+    const userId = req.user?.id;
+
+    if (isAdmin) {
+      // Global Stats for Super Admin
+      const totalUsers = await prisma.user.count();
+      const totalBots = await prisma.botConfig.count({ where: { isActive: true } });
+      
+      const paidOrders = await prisma.order.findMany({
+        where: { status: 'PAID' },
+        select: { totalAmount: true }
+      });
+      const totalRevenue = paidOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+      const totalInventory = await prisma.productAccount.count({ where: { isSold: false } });
+
+      const recentOrders = await prisma.order.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          bot: { select: { botUsername: true } }
+        }
+      });
+
+      return res.json({
+        totalUsers,
+        totalBots,
+        totalRevenue,
+        totalInventory,
+        recentOrders
+      });
+    } else {
+      // Targeted Stats for regular User
+      const myBots = await prisma.botConfig.findMany({ where: { userId } });
+      const botIds = myBots.map(b => b.id);
+
+      const totalBots = myBots.length;
+      const totalProducts = await prisma.product.count({ where: { botId: { in: botIds } } });
+      
+      const paidOrders = await prisma.order.findMany({
+        where: { botId: { in: botIds }, status: 'PAID' },
+        select: { totalAmount: true }
+      });
+      const totalRevenue = paidOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+      
+      const totalInventory = await prisma.productAccount.count({ 
+        where: { product: { botId: { in: botIds } }, isSold: false } 
+      });
+
+      const recentOrders = await prisma.order.findMany({
+        where: { botId: { in: botIds } },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          bot: { select: { botUsername: true } }
+        }
+      });
+
+      return res.json({
+        totalUsers: 0, // Not applicable for regular user
+        totalBots,
+        totalProducts,
+        totalRevenue,
+        totalInventory,
+        recentOrders
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching stats' });
+  }
+};
+
 // Bot Management
 export const getBots = async (req: AuthRequest, res: Response) => {
-  const userId = req.user?.id;
+  const isAdmin = req.user?.role === 'ADMIN';
+  const targetUserId = req.query.userId ? Number(req.query.userId) : null;
+  
+  const userId = (isAdmin && targetUserId) ? targetUserId : req.user?.id;
+  
   const bots = await prisma.botConfig.findMany({ where: { userId } });
   res.json(bots);
 };
 
 export const createBot = async (req: AuthRequest, res: Response) => {
-  const userId = req.user?.id;
-  const { botToken, botUsername, bankName, bankAccount, bankOwner } = req.body;
+  const isAdmin = req.user?.role === 'ADMIN';
+  const { botToken, botUsername, bankName, bankAccount, bankOwner, sepayApiKey, userId: targetUserId } = req.body;
+  const userId = (isAdmin && targetUserId) ? Number(targetUserId) : req.user?.id;
 
   try {
     const bot = await prisma.botConfig.create({
@@ -23,11 +102,35 @@ export const createBot = async (req: AuthRequest, res: Response) => {
         bankName,
         bankAccount,
         bankOwner,
+        sepayApiKey,
       },
     });
     res.status(201).json(bot);
   } catch (error) {
     res.status(400).json({ message: 'Error creating bot' });
+  }
+};
+
+export const updateBot = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { botToken, botUsername, bankName, bankAccount, bankOwner, sepayApiKey, isActive } = req.body;
+
+  try {
+    const bot = await prisma.botConfig.update({
+      where: { id: Number(id) },
+      data: {
+        botToken,
+        botUsername,
+        bankName,
+        bankAccount,
+        bankOwner,
+        sepayApiKey,
+        isActive,
+      },
+    });
+    res.json(bot);
+  } catch (error) {
+    res.status(400).json({ message: 'Error updating bot' });
   }
 };
 
@@ -181,5 +284,70 @@ export const importAccounts = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Import error:', error);
     res.status(400).json({ message: 'Error importing Excel file' });
+  }
+};
+
+// User Management
+export const getUsers = async (req: AuthRequest, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        plan: true,
+        isActive: true,
+        createdAt: true,
+        _count: {
+          select: { bots: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    } as any);
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching users' });
+  }
+};
+
+export const updateUser = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { role, plan, isActive } = req.body;
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: Number(id) },
+      data: {
+        role: role as any,
+        plan,
+        isActive,
+      } as any,
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        plan: true,
+        isActive: true,
+      } as any
+    });
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ message: 'Error updating user' });
+  }
+};
+
+export const deleteUser = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    // Optional: Add logic to prevent deleting yourself or the last admin
+    if (req.user?.id === Number(id)) {
+      return res.status(400).json({ message: 'Cannot delete yourself' });
+    }
+
+    await prisma.user.delete({ where: { id: Number(id) } });
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ message: 'Error deleting user' });
   }
 };
